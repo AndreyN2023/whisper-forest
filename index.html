@@ -130,7 +130,7 @@ body{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
   text-align:center;
   backface-visibility:hidden;
-  touch-action:pan-y; /* горизонтальные свайпы отдаём скрипту */
+  touch-action:pan-y;
   box-shadow:0 32px 60px -22px rgba(0,0,0,.62),
              inset 0 1px 0 rgba(255,255,255,.85),
              inset 0 0 46px rgba(122,102,58,.10);
@@ -188,6 +188,27 @@ body{
 .nav-btn:active{transform:scale(.94)}
 .nav-btn:focus-visible{outline:2px solid var(--gold-soft);outline-offset:3px}
 
+/* ── кнопка звука ── */
+.sound-btn{
+  position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;z-index:3;
+  width:48px;height:48px;border-radius:50%;
+  border:1px solid rgba(250,245,232,.22);
+  background:rgba(10,27,20,.45);
+  backdrop-filter:blur(6px);
+  color:rgba(250,245,232,.6);
+  display:inline-flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  transition:transform .2s ease,background .3s ease,box-shadow .3s ease,color .3s ease;
+}
+.sound-btn svg{width:22px;height:22px}
+.sound-btn .ic-on{display:none}
+.sound-btn.on{color:var(--gold-soft);background:rgba(245,199,106,.16);
+  box-shadow:0 0 26px -6px rgba(245,199,106,.5)}
+.sound-btn.on .ic-on{display:block}
+.sound-btn.on .ic-off{display:none}
+.sound-btn:active{transform:scale(.92)}
+.sound-btn:focus-visible{outline:2px solid var(--gold-soft);outline-offset:3px}
+
 .counter{font-size:12px;letter-spacing:.22em;text-transform:uppercase;
   color:rgba(230,240,225,.45)}
 
@@ -201,6 +222,20 @@ body{
 </style>
 </head>
 <body>
+
+<!-- ═══ ЗВУК ═══ -->
+<button class="sound-btn" id="btnSound" type="button" aria-label="Звук" aria-pressed="false">
+  <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+  </svg>
+  <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+    <path d="M22 9l-6 6"/><path d="M16 9l6 6"/>
+  </svg>
+</button>
 
 <!-- ═══ ФОН ═══ -->
 <div class="scene" aria-hidden="true">
@@ -333,7 +368,6 @@ const CARDS = [
     counter.textContent = `карточка ${i + 1} / ${CARDS.length}`;
   };
 
-  /* переворот с направлением: dir = 1 (вперёд) или -1 (назад) */
   function flip(dir, onSwap) {
     if (busy || !CARDS.length) return;
     busy = true;
@@ -404,13 +438,11 @@ const CARDS = [
 
   card.addEventListener('pointercancel', () => { dragging = false; resetTransform(true); });
 
-  /* тап по карточке = случайная (если это не свайп) */
   card.addEventListener('click', () => {
     if (suppressClick) { suppressClick = false; return; }
     draw();
   });
 
-  /* лёгкий 3D-наклон за курсором (не мешает свайпам) */
   if (matchMedia('(pointer:fine)').matches) {
     card.addEventListener('mousemove', e => {
       if (dragging) return;
@@ -420,6 +452,146 @@ const CARDS = [
       card.style.transform = `rotateY(${x * 7}deg) rotateX(${-y * 7}deg)`;
     });
     card.addEventListener('mouseleave', () => { if (!dragging) resetTransform(true); });
+  }
+})();
+
+/* ═══════════ ГЕНЕРАТИВНЫЙ ЭМБИЕНТ (Web Audio API) ═══════════
+   Никаких файлов: пад-дрон, ветер, колокольчики и птицы
+   синтезируются на лету и звучат бесконечно.            */
+(() => {
+  const btn = document.getElementById('btnSound');
+  const KEY = 'whisper-forest-sound';
+  let enabled = localStorage.getItem(KEY) === '1';
+  let ctx = null, master = null, delay = null, runId = 0;
+
+  /* пентатоника до-мажор (Гц) */
+  const SCALE = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
+
+  function lfo(param, rate, depth) {
+    const o = ctx.createOscillator(); o.frequency.value = rate;
+    const g = ctx.createGain(); g.gain.value = depth;
+    o.connect(g); g.connect(param); o.start();
+  }
+
+  function build() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0;
+    const comp = ctx.createDynamicsCompressor();
+    master.connect(comp); comp.connect(ctx.destination);
+
+    /* ── эхо для колокольчиков ── */
+    delay = ctx.createDelay(2); delay.delayTime.value = .45;
+    const fb  = ctx.createGain(); fb.gain.value = .35;
+    const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 1800;
+    delay.connect(dlp); dlp.connect(fb); fb.connect(delay);
+    const dout = ctx.createGain(); dout.gain.value = .5;
+    delay.connect(dout); dout.connect(master);
+
+    /* ── тёплый пад-дрон (до / соль) ── */
+    const padF = ctx.createBiquadFilter(); padF.type = 'lowpass'; padF.frequency.value = 600; padF.Q.value = .7;
+    const padG = ctx.createGain(); padG.gain.value = .06;
+    padF.connect(padG); padG.connect(master);
+    [[65.41,'sine',.5],[98,'sine',.4],[130.81,'triangle',.25],[196,'triangle',.15]].forEach(([f,type,vol],i) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
+      o.detune.value = i % 2 ? 3 : -3;
+      const g = ctx.createGain(); g.gain.value = vol;
+      lfo(g.gain, .05 + i * .013, vol * .5);
+      o.connect(g); g.connect(padF); o.start();
+    });
+    lfo(padF.frequency, .03, 250);
+
+    /* ── ветер ── */
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+    const nf = ctx.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 500; nf.Q.value = .6;
+    const ng = ctx.createGain(); ng.gain.value = .05;
+    lfo(nf.frequency, .02, 300); lfo(ng.gain, .07, .03);
+    noise.connect(nf); nf.connect(ng); ng.connect(master); noise.start();
+  }
+
+  const pan = () => {
+    if (!ctx.createStereoPanner) return null;
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.random() * 1.2 - .6;
+    p.connect(master); p.connect(delay);
+    return p;
+  };
+
+  /* ── колокольчик ── */
+  function chime(id) {
+    const f = SCALE[Math.floor(Math.random() * SCALE.length)];
+    const t = ctx.currentTime;
+    const o  = ctx.createOscillator(); o.type = 'sine';     o.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f * 2;
+    const g  = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(.12, t + .02);
+    g.gain.exponentialRampToValueAtTime(.0001, t + 2.8);
+    const g2 = ctx.createGain(); g2.gain.value = .03;
+    o2.connect(g2); g2.connect(g); o.connect(g);
+    const out = pan() || (g.connect(master), g.connect(delay), null);
+    if (out) g.connect(out);
+    o.start(t); o2.start(t); o.stop(t + 3); o2.stop(t + 3);
+    setTimeout(() => { if (enabled && id === runId) chime(id); }, 1500 + Math.random() * 4500);
+  }
+
+  /* ── дальняя птица ── */
+  function chirp(id) {
+    const t = ctx.currentTime;
+    const base = 1800 + Math.random() * 1500;
+    const o = ctx.createOscillator(); o.type = 'sine';
+    const g = ctx.createGain(); g.gain.value = 0;
+    const out = pan(); if (out) o.connect(g), g.connect(out); else o.connect(g), g.connect(master);
+    let tt = t;
+    const hops = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < hops; i++) {
+      const f = base * (1 + Math.random() * .3);
+      o.frequency.setValueAtTime(f, tt);
+      o.frequency.exponentialRampToValueAtTime(f * 1.4, tt + .06);
+      o.frequency.exponentialRampToValueAtTime(f * .9,  tt + .12);
+      g.gain.setValueAtTime(0, tt);
+      g.gain.linearRampToValueAtTime(.045, tt + .02);
+      g.gain.linearRampToValueAtTime(0, tt + .14);
+      tt += .16 + Math.random() * .05;
+    }
+    o.start(t); o.stop(tt + .1);
+    setTimeout(() => { if (enabled && id === runId) chirp(id); }, 7000 + Math.random() * 14000);
+  }
+
+  async function start() {
+    if (!ctx) build();
+    await ctx.resume();
+    master.gain.setTargetAtTime(.9, ctx.currentTime, 1.2);
+    runId++;
+    chime(runId); chirp(runId);
+  }
+
+  function stop() {
+    if (!ctx) return;
+    runId++;
+    master.gain.setTargetAtTime(0, ctx.currentTime, .5);
+    setTimeout(() => { if (!enabled && ctx.state === 'running') ctx.suspend(); }, 1400);
+  }
+
+  function setEnabled(on) {
+    enabled = on;
+    localStorage.setItem(KEY, on ? '1' : '0');
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on);
+    on ? start() : stop();
+  }
+
+  btn.classList.toggle('on', enabled);
+  btn.setAttribute('aria-pressed', enabled);
+  btn.addEventListener('click', () => setEnabled(!enabled));
+
+  /* если звук был включён ранее — стартуем с первым касанием */
+  if (enabled) {
+    const kick = () => { if (enabled && ctx === null || (ctx && ctx.state !== 'running')) start(); };
+    addEventListener('pointerdown', kick, { once: true });
+    addEventListener('keydown', kick, { once: true });
   }
 })();
 
