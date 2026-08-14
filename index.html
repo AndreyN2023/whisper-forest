@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a1b14">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Шёпот леса">
+
+<title>Шёпот леса · случайная карточка</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════ БАЗА ═══════════════════ */
+:root{
+  --pine-950:#050f0b;
+  --pine-900:#0a1b14;
+  --gold:#f5c76a;
+  --gold-soft:#ffe3a3;
+  --paper:#faf5e8;
+  --paper-2:#efe4cb;
+  --ink:#274236;
+  --ink-soft:#5c7367;
+  --mx:0; --my:0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{height:100%}
+body{
+  min-height:100svh;
+  font-family:'Manrope',system-ui,sans-serif;
+  background:#0a1b14;
+  color:var(--paper);
+  overflow-x:hidden;
+  overflow-y:auto;
+  touch-action:manipulation;
+}
+::selection{background:rgba(245,199,106,.35)}
+
+/* ═══════════════════ СЦЕНА / АМБИЕНТ ═══════════════════ */
+.scene{position:fixed;inset:0;z-index:0;overflow:hidden}
+
+.sky{position:absolute;inset:0;
+  background:linear-gradient(180deg,#071511 0%,#0c2019 34%,#153428 58%,#1d4531 80%,#27553a 100%);}
+.sky::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,#04100c 0%,#0a1f18 40%,#1c4030 75%,#2c5c3e 100%);
+  animation:skyShift 26s ease-in-out infinite alternate}
+@keyframes skyShift{from{opacity:0}to{opacity:.75}}
+
+.glow{position:absolute;border-radius:50%;filter:blur(55px);mix-blend-mode:screen;
+  transform:translate3d(calc(var(--mx)*-12px),calc(var(--my)*-8px),0)}
+.glow.sun{width:70vmax;height:70vmax;left:calc(50% - 35vmax);top:calc(82% - 35vmax);
+  background:radial-gradient(circle,#ffd98a 0%,rgba(245,169,75,.22) 35%,transparent 70%);
+  animation:breathe 9s ease-in-out infinite}
+.glow.moon{width:32vmax;height:32vmax;left:calc(13vw - 16vmax);top:calc(9vh - 16vmax);
+  background:radial-gradient(circle,rgba(205,232,216,.4) 0%,transparent 70%);
+  animation:breathe 13s ease-in-out infinite reverse}
+@keyframes breathe{0%,100%{opacity:.5}50%{opacity:.85}}
+
+.mist{position:absolute;left:-10%;width:120%;height:24vh;filter:blur(32px);
+  background:radial-gradient(ellipse at center,rgba(218,238,224,.5),transparent 70%);
+  animation:drift 46s ease-in-out infinite alternate}
+.mist.m1{bottom:9vh;opacity:.30}
+.mist.m2{bottom:20vh;opacity:.18;animation-duration:64s;animation-delay:-22s}
+@keyframes drift{from{transform:translateX(-5%)}to{transform:translateX(5%)}}
+
+.hills{position:absolute;bottom:-2px;left:-14px;width:calc(100% + 28px);
+  height:min(38vh,340px);
+  transform:translate3d(calc(var(--mx)*9px),0,0)}
+
+#fx{position:absolute;inset:0;width:100%;height:100%}
+
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 52%,rgba(3,10,7,.6) 100%)}
+
+/* ═══════════════════ КОНТЕНТ ═══════════════════ */
+.wrap{position:relative;z-index:2;min-height:100svh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:26px;
+  padding:calc(34px + env(safe-area-inset-top)) 18px calc(70px + env(safe-area-inset-bottom))}
+
+.head{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.head-leaf{width:34px;height:34px;color:var(--gold-soft);
+  filter:drop-shadow(0 0 14px rgba(245,199,106,.55));
+  animation:sway 6s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+.title{font-family:'Cormorant',Georgia,serif;font-weight:600;
+  font-size:clamp(32px,5.4vw,50px);letter-spacing:.06em;
+  text-shadow:0 2px 26px rgba(0,0,0,.5)}
+.title span{color:var(--gold-soft)}
+.subtitle{font-size:clamp(13px,1.6vw,15px);letter-spacing:.05em;
+  color:rgba(228,240,226,.62);max-width:46ch;line-height:1.6}
+
+/* ── карточка ── */
+.card-scene{perspective:1200px}
+.card-float{animation:float 7s ease-in-out infinite;transform-style:preserve-3d}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+
+.card-swap{transform-style:preserve-3d}
+.card-swap.is-in{animation:cardIn .58s cubic-bezier(.22,1,.36,1) both}
+
+/* ✦ ПЕРЕВОРОТ */
+.card-swap.is-flip-out{animation:flipOut .4s cubic-bezier(.45,.05,.7,.3) both}
+.card-swap.is-flip-in {animation:flipIn .55s cubic-bezier(.2,.9,.3,1.12) both}
+@keyframes flipOut{
+  0%  {transform:rotateY(0deg)   translateY(0)    scale(1)}
+  100%{transform:rotateY(90deg)  translateY(-8px) scale(.94)}
+}
+@keyframes flipIn{
+  0%  {transform:rotateY(-90deg) translateY(-8px) scale(.94)}
+  100%{transform:rotateY(0deg)   translateY(0)    scale(1)}
+}
+
+.card{
+  position:relative;width:min(560px,88vw);min-height:clamp(220px,32vh,320px);
+  border-radius:22px;cursor:pointer;user-select:none;
+  background:linear-gradient(160deg,var(--paper) 0%,var(--paper-2) 100%);
+  color:var(--ink);
+  padding:clamp(30px,5vw,52px) clamp(24px,6vw,58px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  text-align:center;
+  backface-visibility:hidden;
+  box-shadow:0 32px 60px -22px rgba(0,0,0,.62),
+             inset 0 1px 0 rgba(255,255,255,.85),
+             inset 0 0 46px rgba(122,102,58,.10);
+  transition:box-shadow .35s ease;
+  will-change:transform;
+}
+.card:hover{
+  box-shadow:0 38px 74px -24px rgba(0,0,0,.68),
+             0 0 46px -6px rgba(245,199,106,.22),
+             inset 0 1px 0 rgba(255,255,255,.85),
+             inset 0 0 46px rgba(122,102,58,.10)}
+.card:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+.card::before{content:"";position:absolute;inset:11px;border-radius:14px;
+  border:1px solid rgba(70,105,86,.35);pointer-events:none}
+
+.ornament{width:min(170px,46%);height:auto;flex:none}
+.card-text{font-family:'Cormorant',Georgia,serif;font-weight:500;
+  font-size:clamp(21px,3.3vw,29px);line-height:1.5;white-space:pre-line;
+  text-wrap:balance;user-select:text}
+.card-star{color:#bd983f;font-size:15px;letter-spacing:.5em;padding-left:.5em}
+
+/* ── кнопка ── */
+.btn{
+  position:relative;overflow:hidden;cursor:pointer;
+  font-family:'Manrope',sans-serif;font-weight:700;font-size:16px;letter-spacing:.04em;
+  color:#0b1d15;border:none;border-radius:999px;padding:16px 36px;
+  display:inline-flex;align-items:center;gap:11px;
+  background:linear-gradient(135deg,#ffe9b0,#f5c76a 55%,#e0a94e);
+  box-shadow:0 12px 32px -10px rgba(245,199,106,.5),inset 0 1px 0 rgba(255,255,255,.75);
+  transition:transform .2s ease,box-shadow .3s ease;
+}
+.btn:hover{transform:translateY(-2px) scale(1.03);
+  box-shadow:0 18px 44px -10px rgba(245,199,106,.65),inset 0 1px 0 rgba(255,255,255,.75)}
+.btn:active{transform:translateY(1px) scale(.98)}
+.btn:focus-visible{outline:2px solid var(--gold-soft);outline-offset:4px}
+.btn::after{content:"";position:absolute;top:0;bottom:0;left:-70%;width:45%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);
+  transform:skewX(-20deg);animation:shine 4.6s ease-in-out infinite}
+@keyframes shine{0%,55%{left:-70%}90%,100%{left:135%}}
+
+.counter{font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(230,240,225,.45)}
+
+.foot{position:fixed;left:0;right:0;bottom:calc(13px + env(safe-area-inset-bottom));
+  z-index:2;text-align:center;font-size:12px;letter-spacing:.14em;
+  color:rgba(230,240,225,.38);pointer-events:none}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ ФОН ═══ -->
+<div class="scene" aria-hidden="true">
+  <div class="sky"></div>
+  <div class="glow sun"></div>
+  <div class="glow moon"></div>
+  <div class="mist m1"></div>
+  <div class="mist m2"></div>
+
+  <svg class="hills" viewBox="0 0 1440 340" preserveAspectRatio="none">
+    <path fill="#17372a" d="M0,190 C240,120 420,240 720,180 C1020,120 1200,230 1440,170 L1440,340 L0,340 Z"/>
+    <path fill="#102a1f" d="M0,240 C200,180 480,270 760,220 C1040,170 1240,260 1440,215 L1440,340 L0,340 Z"/>
+    <path fill="#0a1e15" d="M0,285 C260,230 520,300 820,265 C1120,235 1300,300 1440,272 L1440,340 L0,340 Z"/>
+    <g fill="#06150e">
+      <path d="M96,278 l14,-46 14,46 z"/><path d="M124,281 l11,-34 11,34 z"/><path d="M150,278 l13,-40 13,40 z"/>
+      <path d="M604,283 l12,-38 12,38 z"/><path d="M630,286 l9,-28 9,28 z"/><path d="M652,284 l13,-42 13,42 z"/>
+      <path d="M1204,281 l13,-42 13,42 z"/><path d="M1232,284 l10,-30 10,30 z"/><path d="M1256,281 l14,-46 14,46 z"/>
+    </g>
+  </svg>
+
+  <canvas id="fx"></canvas>
+</div>
+<div class="vignette" aria-hidden="true"></div>
+
+<!-- ═══ ИНТЕРФЕЙС ═══ -->
+<main class="wrap">
+  <header class="head">
+    <svg class="head-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+    </svg>
+    <h1 class="title">Шёпот <span>леса</span></h1>
+    <p class="subtitle">Нажмите на карточку или на кнопку ниже — и узнайте, что лес шепнёт вам сегодня</p>
+  </header>
+
+  <div class="card-scene">
+    <div class="card-float">
+      <div class="card-swap" id="cardSwap">
+        <article class="card" id="card" role="button" tabindex="0" aria-live="polite">
+          <svg class="ornament" viewBox="0 0 180 30" aria-hidden="true">
+            <g stroke="#7d9a63" stroke-width="1.4" stroke-linecap="round" fill="none">
+              <path d="M14 15 H64"/><path d="M116 15 H166"/>
+            </g>
+            <g fill="#6f8f55">
+              <path d="M90 3 C95 7 95 13 90 17 C85 13 85 7 90 3 Z"/>
+              <path d="M78 15 C74 9 66 9 63 13 C66 19 74 19 78 15 Z"/>
+              <path d="M102 15 C106 9 114 9 117 13 C114 19 106 19 102 15 Z"/>
+            </g>
+            <g fill="#c9a24a">
+              <circle cx="14" cy="15" r="1.8"/><circle cx="166" cy="15" r="1.8"/>
+            </g>
+          </svg>
+          <p class="card-text" id="cardText">…</p>
+          <div class="card-star" aria-hidden="true">✦</div>
+        </article>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn" id="btnRandom" type="button">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+      <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+    </svg>
+    Случайная карточка
+  </button>
+
+  <div class="counter" id="counter"></div>
+</main>
+
+<div class="foot">🌿 лес слушает…</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   ТЕКСТЫ КАРТОЧЕК — 11 философских посланий
+   ══════════════════════════════════════════════════════════ */
+const CARDS = [
+  "Гармония приходит, когда вы перестаете бороться с собой и начинаете искренне себя слышать. Отпустите всё лишнее, чтобы освободить место для того, что наполняет вас радостью и смыслом.",
+  "Любовь и доброта притягиваются к тому, кто сам становится их источником. Начните искренне дарить это миру, и он обязательно ответит вам взаимностью.",
+  "Долговечное строится на прочном фундаменте подлинных ценностей, смысла и непрерывной заботы. Создавайте то, что приносит пользу другим, ведь время сохраняет лишь то, что по-настоящему важно.",
+  "Смысл не находят, его создают через свои ежедневные выборы, заботу о других и преданность любимому делу. Станьте автором собственной истории, вкладывая душу в каждый прожитый день.",
+  "Вы поймете, что добились успеха, когда перестанете измерять его внешними атрибутами и обретете глубокий внутренний покой. Истинный успех ощущается не как громкая победа, а как тихая благодарность за то, кем вы стали.",
+  "Страдания часто рождаются из нашего сопротивления реальности и болезненной привязанности к тому, что мы не в силах изменить. Воспринимайте их не как наказание, а как сурового учителя, который через трещины в сердце пропускает свет подлинной мудрости и сострадания.",
+  "Всё никогда не вернется к прежней «норме», ведь и вы, и мир вокруг безвозвратно изменились. Истинное равновесие приходит не от возврата к прошлому, а от умения находить твердую опору внутри себя в любых переменах.",
+  "Примирение приходит, когда вы смещаете фокус с того, как тело выглядит, на то, что оно чувствует и умеет. Относитесь к нему не как к проекту, требующему бесконечных исправлений, а как к своему единственному дому, который заслуживает заботы и благодарности.",
+  "Хорошим родителем становятся не через безупречность, а через искреннее присутствие и готовность расти вместе с ребенком. Дарите ему безусловное принятие и не бойтесь признавать свои ошибки, ведь ваша честность станет для него лучшим жизненным ориентиром.",
+  "Знание разрушает оковы невежества и страхов, давая нам власть делать осознанный выбор вместо того, чтобы слепо подчиняться обстоятельствам. Истинная свобода невозможна без понимания, ведь лишь тот, кто ясно видит путь, волен по нему идти.",
+  "Примите одиночество не как изоляцию, а как ценное приглашение глубже узнать и подружиться с самим собой. А когда обретете эту внутреннюю опору, сделайте искренний шаг навстречу миру, ведь настоящая близость с другими рождается из умения быть в ладу с собой.",
+];
+/* ══════════════════════════════════════════════════════════ */
+
+(() => {
+  const swap    = document.getElementById('cardSwap');
+  const card    = document.getElementById('card');
+  const textEl  = document.getElementById('cardText');
+  const btn     = document.getElementById('btnRandom');
+  const counter = document.getElementById('counter');
+
+  const FLIP_OUT_MS = 400;
+  const FLIP_IN_MS  = 550;
+
+  let current = -1, busy = false;
+
+  const pick = () => {
+    if (CARDS.length < 2) return 0;
+    let i;
+    do { i = Math.floor(Math.random() * CARDS.length); } while (i === current);
+    return i;
+  };
+
+  const render = i => {
+    current = i;
+    textEl.textContent = CARDS[i] ?? '…';
+    counter.textContent = `карточка ${i + 1} / ${CARDS.length}`;
+  };
+
+  function draw() {
+    if (busy || !CARDS.length) return;
+    busy = true;
+    swap.classList.remove('is-in', 'is-flip-in');
+    swap.classList.add('is-flip-out');
+    setTimeout(() => {
+      render(pick());
+      swap.classList.remove('is-flip-out');
+      swap.classList.add('is-flip-in');
+      setTimeout(() => busy = false, FLIP_IN_MS + 40);
+    }, FLIP_OUT_MS);
+  }
+
+  render(pick());
+  requestAnimationFrame(() => swap.classList.add('is-in'));
+
+  btn.addEventListener('click', draw);
+  card.addEventListener('click', draw);
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); draw(); }
+  });
+
+  if (matchMedia('(pointer:fine)').matches) {
+    card.addEventListener('mousemove', e => {
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width  - .5;
+      const y = (e.clientY - r.top)  / r.height - .5;
+      card.style.transform = `rotateY(${x * 7}deg) rotateX(${-y * 7}deg)`;
+    });
+    card.addEventListener('mouseleave', () => card.style.transform = '');
+  }
+})();
+
+/* ═══════════ АМБИЕНТ: звёзды, светлячки, листья ═══════════ */
+(() => {
+  const cv = document.getElementById('fx');
+  const ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W, H, DPR;
+  const stars = [], flies = [], leaves = [];
+  const LEAF_C = ['rgba(150,180,110,','rgba(196,164,90,','rgba(122,152,100,','rgba(210,180,110,'];
+
+  const sprite = document.createElement('canvas');
+  sprite.width = sprite.height = 64;
+  const sc = sprite.getContext('2d');
+  const g = sc.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(255,236,170,1)');
+  g.addColorStop(.35,'rgba(255,214,120,.55)');
+  g.addColorStop(1,'rgba(255,200,90,0)');
+  sc.fillStyle = g; sc.fillRect(0,0,64,64);
+
+  const newFly = () => ({
+    x: Math.random()*W, y: H*(.35 + Math.random()*.6),
+    a: Math.random()*Math.PI*2, sp: .2 + Math.random()*.5,
+    r: (1.2 + Math.random()*1.8)*DPR, p: Math.random()*Math.PI*2, f: .5 + Math.random()*1.5
+  });
+  const newLeaf = top => ({
+    x: Math.random()*W, y: top ? -24*DPR : Math.random()*H,
+    vy: (.25 + Math.random()*.5)*DPR, sway: .4 + Math.random()*1.2,
+    p: Math.random()*Math.PI*2, size: (4 + Math.random()*6)*DPR,
+    rot: Math.random()*Math.PI*2, vr: (Math.random()-.5)*.02,
+    c: LEAF_C[Math.floor(Math.random()*LEAF_C.length)]
+  });
+
+  function seed() {
+    stars.length = flies.length = leaves.length = 0;
+    for (let i=0, n=Math.floor(innerWidth/13); i<n; i++)
+      stars.push({x:Math.random()*W, y:Math.random()*H*.52,
+                  r:(Math.random()*1.1+.4)*DPR, p:Math.random()*7, s:.4+Math.random()*1.3});
+    for (let i=0, n=Math.floor(innerWidth/34); i<n; i++) flies.push(newFly());
+    for (let i=0, n=Math.max(5,Math.floor(innerWidth/120)); i<n; i++) leaves.push(newLeaf(false));
+  }
+
+  function resize() {
+    DPR = Math.min(devicePixelRatio || 1, 2);
+    W = cv.width  = innerWidth  * DPR;
+    H = cv.height = innerHeight * DPR;
+    cv.style.width  = innerWidth  + 'px';
+    cv.style.height = innerHeight + 'px';
+    seed();
+  }
+
+  let t = 0;
+  function frame() {
+    t += .016;
+    ctx.clearRect(0,0,W,H);
+
+    ctx.fillStyle = 'rgba(228,240,228,1)';
+    for (const s of stars) {
+      ctx.globalAlpha = .22 + .55*(.5 + .5*Math.sin(t*s.s + s.p));
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    }
+
+    for (const L of leaves) {
+      L.p += .03*L.sway; L.y += L.vy; L.x += Math.sin(L.p)*.6*DPR; L.rot += L.vr;
+      if (L.y > H + 30) Object.assign(L, newLeaf(true));
+      ctx.save(); ctx.translate(L.x, L.y); ctx.rotate(L.rot);
+      ctx.globalAlpha = 1; ctx.fillStyle = L.c + '.45)';
+      ctx.beginPath(); ctx.ellipse(0, 0, L.size, L.size*.45, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+
+    for (const f of flies) {
+      f.a += (Math.random()-.5)*.3;
+      f.x += Math.cos(f.a)*f.sp*DPR;
+      f.y += Math.sin(f.a)*f.sp*.55*DPR;
+      if (f.x < -30) f.x = W+20; else if (f.x > W+30) f.x = -20;
+      if (f.y < H*.25 || f.y > H*.98) f.a = -f.a;
+      const tw = .5 + .5*Math.sin(t*f.f*2 + f.p);
+      ctx.globalAlpha = .18 + .8*tw;
+      const s = f.r*(6 + 2.4*tw);
+      ctx.drawImage(sprite, f.x - s/2, f.y - s/2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function loop(){ frame(); if (!reduce) requestAnimationFrame(loop); }
+
+  let rt;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 150); });
+  resize(); loop();
+
+  if (!reduce) addEventListener('mousemove', e => {
+    document.documentElement.style.setProperty('--mx', (e.clientX/innerWidth*2 - 1).toFixed(3));
+    document.documentElement.style.setProperty('--my', (e.clientY/innerHeight*2 - 1).toFixed(3));
+  });
+})();
+</script>
+
+<!-- ═══ PWA: офлайн-режим ═══ -->
+<script>
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
